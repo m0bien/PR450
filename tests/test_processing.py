@@ -200,3 +200,66 @@ def test_remod_exact_at_idle_with_12bit_adc(seed):
     sim = simulate(wf, Scenario(), seed=seed)
     _, grid_hat, _ = demod_remod(sim.ref, wf)
     assert int(np.sum(np.abs(grid_hat - wf.grid) > 1e-9)) == 0
+
+
+# ---- regression tests for fixes from the external code review ----------------------------
+
+def test_clean_refit_removes_slow_target_deeply(lte_wf):
+    """One fit on the ECA output under-estimates the echo by its zero-Doppler projection
+    (~-37 dB left of a 5.7 Hz target); the default refit reaches ~-50 dB."""
+    from pr450.core import EcaCanceller, clean
+    s, fs = lte_wf.iq, lte_wf.fs
+    t = np.arange(len(s)) / fs
+    rng = np.random.default_rng(11)
+    noise = (rng.standard_normal(len(s)) + 1j * rng.standard_normal(len(s))) / np.sqrt(2)
+    clutter = apply_fir(s, fractional_delay_fir([0, 3.4, 9.7, 40.2], [300, 60j, -40, 20]))
+    echo = 3.0 * _echo(s, 112.96, 12.6, 1.0, fs)
+    surv = clutter + echo + noise
+    canc = EcaCanceller(s, 64, n_lead=16)
+    target_free = canc(clutter + noise).output
+    kw = dict(doppler_max_hz=200, window=("taylor", 4, 40), range_window=("taylor", 4, 40), occupied_bw_hz=300 * 15e3)
+    det = dict(pfa=1e-6, min_delay_samples=2, exclude_zero_doppler_hz=3.0)
+
+    def left_db(refits):
+        res = clean(surv, s, fs, 256, kw, det, threshold_db=18.0, max_iter=1, canceller=lambda v: canc(v).output,
+                    refits=refits)
+        return 10 * np.log10(np.sum(np.abs(res.residual - target_free) ** 2) / np.sum(np.abs(echo) ** 2))
+
+    assert left_db(1) < left_db(0) - 6
+    assert left_db(1) < -45
+
+
+def test_clean_reports_valid_map_indices(lte_wf):
+    from pr450.core import clean
+    s, fs = lte_wf.iq, lte_wf.fs
+    surv = _echo(s, 120.3, 25.4, 1.0, fs) + 0.01 * s
+    res = clean(surv, s, fs, 256, dict(doppler_max_hz=200), dict(pfa=1e-6, min_delay_samples=2), max_iter=1)
+    comp = res.detections[0]
+    n_delay, n_doppler = res.rd.data.shape
+    assert 0 <= comp.delay_idx < n_delay and 0 <= comp.doppler_idx < n_doppler
+    assert abs(res.rd.doppler_hz[comp.doppler_idx] - 25.4) <= abs(res.rd.doppler_hz[1] - res.rd.doppler_hz[0])
+
+
+def test_caf_ofdm_unit_peak_and_exact_doppler_axis(lte_wf):
+    s, fs = lte_wf.iq, lte_wf.fs
+    rd = caf_ofdm(s, lte_wf, lte_wf.grid, 32, doppler_max_hz=None, window=None)
+    # unit gain per used RE: the zero-delay peak equals the fraction of occupied REs
+    occupied = np.mean(lte_wf.re_type != 0)
+    assert abs(np.abs(rd.data[0, np.argmin(np.abs(rd.doppler_hz))]) - occupied) < 1e-6
+    assert np.isclose(np.diff(rd.doppler_hz).mean(), 14000.0 / lte_wf.n_symbols)
+
+
+def test_eca_merges_short_tail_batch():
+    from pr450.core import EcaCanceller
+    rng = np.random.default_rng(0)
+    ref = rng.standard_normal(10_000) + 1j * rng.standard_normal(10_000)
+    canc = EcaCanceller(ref, 8, batch_len=4096, window=0)       # 10000 = 2 x 4096 + 1808 (< 2048)
+    assert [e - s for s, e in canc.bounds] == [4096, 5904]
+    with pytest.raises(ValueError):
+        canc(ref[:9000])
+
+
+def test_fractional_delay_fir_edge_cases():
+    assert np.all(fractional_delay_fir([], []) == 0)
+    with pytest.raises(ValueError):
+        fractional_delay_fir([-3.0], [1.0])

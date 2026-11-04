@@ -127,3 +127,27 @@ def test_structural_empty_marks_only_empty_reserved_res():
         se = wf.structural_empty
         assert se is not None and se.any()
         assert np.all(wf.re_type[se] == 0)
+
+
+def test_lte_one_port_leaves_port1_crs_positions_empty_in_control_symbol():
+    """TS 36.211 6.2.4: REGs in symbol 0 assume CRS on ports 0 and 1 even with one port."""
+    from pr450.waveform.lte import lte_crs_subcarriers
+    wf = generate_lte(LteConfig(n_ports=1), "full", 0.01)
+    k1 = lte_crs_subcarriers(wf.cell_id, 1, 0, 25)
+    for sf in range(10):
+        sym = 14 * sf
+        assert np.all(wf.re_type[sym, k1] == 0)
+        assert np.all(wf.structural_empty[sym, k1])
+
+
+def test_nr_5ms_ssb_period_fills_both_half_frames():
+    wf = generate_nr(NrConfig(ssb_period_ms=5, trs_period_ms=None, sib1_period_ms=None), "idle", 0.02)
+    sync_symbols = np.unique(np.nonzero(wf.re_type == RE_SYNC)[0])
+    np.testing.assert_array_equal(sync_symbols, [2, 4, 72, 74, 142, 144, 212, 214])
+
+
+def test_nr_20ms_ssb_period_counts_from_sfn0():
+    """With a 20 ms period and an odd starting SFN the first frame correctly carries no SSB."""
+    wf = generate_nr(NrConfig(sfn0=1, trs_period_ms=None, sib1_period_ms=None), "idle", 0.02)
+    sync_symbols = np.unique(np.nonzero(wf.re_type == RE_SYNC)[0])
+    np.testing.assert_array_equal(sync_symbols, [142, 144])

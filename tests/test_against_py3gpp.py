@@ -116,3 +116,17 @@ def test_ofdm_modulation_matches_up_to_scale():
     scale = np.vdot(mine, ref) / np.vdot(mine, mine)
     err = np.linalg.norm(ref - scale * mine) / np.linalg.norm(ref)
     assert err < 1e-9, f"relative error {err:.2e} (scale {scale:.4g})"
+
+
+@pytest.mark.parametrize("cell_id", [1, 1007])
+def test_ssb_second_half_frame_uses_nhf_in_pbch_dmrs(cell_id):
+    """5 ms SSB period: the burst in the second half-frame uses i_bar = i_SSB + 4 (38.211 7.4.1.4.1)."""
+    cfg = NrConfig(cell_id=cell_id, ssb_period_ms=5, ssb_bitmap=(1, 0, 0, 0), trs_period_ms=None, sib1_period_ms=None)
+    wf = generate_nr(cfg, "idle", 0.01)
+    known = np.where(np.isin(wf.re_type, (RE_PILOT, RE_SYNC)), wf.grid, 0)
+    block = known[70 + 2:70 + 6, cfg.ssb_k0:cfg.ssb_k0 + SSB_SC]     # slot 5, symbols 2..5
+    ref = np.zeros(SSB_SC * 4, dtype=complex)
+    ref[np.asarray(py3gpp.nrPSSIndices())] = py3gpp.nrPSS(cell_id)
+    ref[np.asarray(py3gpp.nrSSSIndices())] = py3gpp.nrSSS(cell_id)
+    ref[np.asarray(py3gpp.nrPBCHDMRSIndices(cell_id))] = py3gpp.nrPBCHDMRS(cell_id, 4)
+    np.testing.assert_allclose(block, ref.reshape(4, SSB_SC), atol=1e-12)

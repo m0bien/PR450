@@ -112,7 +112,7 @@ What caused the false alarms, measured before any fix:
 
 **Costs and remaining issues:**
 - **SNR:** sidelobe control costs about 4–10 dB of target SNR against the CFAR noise estimate (window losses, plus noise weighting from normalisation). The trade-off needs tuning by Pd/Pfa Monte Carlo, for example lighter Taylor windows or α < 0.5.
-- **NR residual false alarm:** a second-order comb ghost of the car's subtraction residual (+2 × 5.1 km, −5 × 50 Hz).
+- **Fixed: NR residual false alarm.** A second-order comb ghost came from an incomplete car subtraction. CLEAN now refits each target once on the re-cancelled residual (see below), and the explorer's CLEAN stage shows 0 false alarms in all 10 network × load cases.
 - **CLEAN:** about 40 s per CPI in NumPy, dominated by the 51-column echo fit.
 
 **Pd/Pfa Monte Carlo** (`run_pd_pfa_study.py`). The study used 1,728 weak-target trials per setting, through the full chain with clutter and a 12-bit ADC, at Pfa 1e-6 and a 0.5 s CPI. Detailed results are in `results/pd_pfa/`. "Loss" below is the SNR needed for Pd 0.9 relative to an ideal CA-CFAR.
@@ -156,6 +156,24 @@ What caused the false alarms, measured before any fix:
 2. **The ECA needs pre-cursor taps** (`n_lead`). Band-limited sub-sample clutter delays have tails at negative lags; without them the residual stayed ~5 dB above noise.
 3. **The channel estimate must be a delay-domain fit limited to the CP length.** A frequency-domain smoother biased the frequency-selective reference channel (EVM −49 dB instead of ≈ −75 dB).
 4. **ADC gain should be set for busy-hour load,** not by a per-record AGC. Bursty idle signals otherwise clip.
+
+## External code review (fixes)
+
+An independent review was checked claim by claim, measuring where it mattered. Each fix has a regression test.
+
+| Finding | Verdict | Change |
+|---|---|---|
+| CLEAN fits the echo on the ECA output with an unprojected dictionary | **Real.** −37 dB of a 5.7 Hz target was left after one fit | `clean(refits=1)`: refit on the re-cancelled residual, about −52 dB. Targets within about 1/T of 0 Hz stay partly in ECA's notch (−25 dB at 1 Hz). |
+| 1-port LTE: control region used port-1 CRS positions in symbol 0 | Real (TS 36.211 §6.2.4) | Those REs stay empty and are marked structurally empty |
+| CLEAN components reported `doppler_idx = -1`, unclamped `delay_idx` | Real, latent | Indices computed from the final map and clamped |
+| `caf_ofdm` symbol period and amplitude scale | Real, small (0.0007 % axis error) | Exact mean period; unit gain per used RE |
+| Short ECA tail batch; Gram dictionary built twice | Real (ECA-B/S only; perf) | Tail merged into the previous batch; one build per batch; strict length check |
+| NR SSB with a 5 ms period missed the second half-frame | Real | Both half-frames, with n_hf in the PBCH-DMRS (checked against py3gpp) |
+| `fractional_delay_fir` with an empty or negative delay | Real, edge case | Empty → zero FIR; negative → error (no index wrap existed) |
+| NR SSB "breaks" for odd `sfn0` | Not a bug | Periodicity counts from SFN 0 by spec; the proposed fix would break it (test added) |
+| CA-CFAR edge Pfa inflated by `mode="nearest"` | Not observed | Measured edge Pfa 9.9e-4 vs interior 9.6e-4 (nominal 1e-3) |
+| 2-port CRS summed onto one grid | Modelling assumption, as documented | Independent port channels move the CRS-comb ghosts by only 1–1.5 dB (−7.0 → −7.7/−8.1 dB at 6.66 km); a per-port channel model remains an option |
+| ADC full-scale assumes incoherent multipath | Not significant | Paths 0.5 and 1.4 µs apart (≫ 1/B) are effectively uncorrelated |
 
 ## Known simplifications
 

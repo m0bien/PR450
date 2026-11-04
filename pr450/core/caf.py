@@ -205,8 +205,9 @@ def caf_ofdm(
 
     spec = np.zeros((wf.n_symbols, num.nfft), dtype=complex)
     spec[:, num.subcarrier_bins()] = h
-    profiles = ifft(spec, axis=1)[:, :max_delay_samples]
+    # x nfft / n_sc: a unit-gain echo gives a unit peak (only n_sc of the nfft bins are filled)
+    profiles = ifft(spec, axis=1)[:, :max_delay_samples] * (num.nfft / num.n_sc)
 
-    dt = (wf.sym_starts[-1] - wf.sym_starts[0]) / (wf.n_symbols - 1) / wf.fs
+    dt = len(wf.iq) / wf.n_symbols / wf.fs        # mean symbol period, exact for whole slots (1/14 ms)
     data, f = _doppler_fft(profiles, window, dt, doppler_max_hz)
     return RDMap(data, np.arange(max_delay_samples) / wf.fs, f)

@@ -184,14 +184,20 @@ def generate_lte(
         active = rng.random() < load.tti_activity
         sib1_now = cfg.sib1 and sf == 5 and sfn % 2 == 0
 
-        # Guard REs around PSS/SSS and REs PBCH leaves for CRS ports that are not transmitted
+        # REG mapping in symbol 0 always assumes CRS on ports 0 and 1 (TS 36.211 6.2.4),
+        # so with one port the port-1 CRS positions there stay empty
+        if cfg.n_ports == 1:
+            reserved[0, lte_crs_subcarriers(cell, 1, 0, cfg.n_rb)] = True
+
+        # Guard REs around PSS/SSS, REs PBCH leaves for CRS ports that are not transmitted,
+        # and (1 port) the port-1 CRS positions of the control region
         structural_empty[base:base + 14] = reserved & (t == RE_EMPTY)
 
         # Control region, occupied in PRB x symbol blocks (a coarse stand-in for REG clustering)
         ctrl_fraction = min(1.0, 0.1 + 0.5 * active + 0.15 * sib1_now)
         ctrl = np.zeros((14, n_sc), dtype=bool)
         used_blocks = rng.random((cfg.cfi, cfg.n_rb)) < ctrl_fraction
-        ctrl[:cfg.cfi] = np.repeat(used_blocks, 12, axis=1) & (t[:cfg.cfi] == RE_EMPTY)
+        ctrl[:cfg.cfi] = np.repeat(used_blocks, 12, axis=1) & (t[:cfg.cfi] == RE_EMPTY) & ~reserved[:cfg.cfi]
         fill_random(g, t, b, ctrl, RE_CONTROL, 2, rng)
         reserved[:cfg.cfi] = True
 

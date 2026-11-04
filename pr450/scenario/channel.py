@@ -54,8 +54,14 @@ class SimResult:
 
 
 def fractional_delay_fir(delays_samples, gains) -> np.ndarray:
+    """Windowed-sinc FIR for a sum of delayed paths; output is delayed by FIR_HALF samples (apply_fir removes it).
+    Delays must be >= 0 (relative to the direct path); an empty path list gives an all-zero FIR."""
     delays_samples = np.atleast_1d(np.asarray(delays_samples, dtype=float))
     gains = np.atleast_1d(np.asarray(gains, dtype=complex))
+    if delays_samples.size == 0:
+        return np.zeros(2 * FIR_HALF + 1, dtype=complex)
+    if delays_samples.min() < 0:
+        raise ValueError("fractional_delay_fir: delays must be >= 0 samples")
     n = np.arange(int(np.ceil(delays_samples.max())) + 2 * FIR_HALF + 1)
     h = np.zeros(len(n), dtype=complex)
     for d, g in zip(delays_samples, gains):

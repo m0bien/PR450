@@ -69,9 +69,16 @@ class EcaCanceller:
         self.fs = fs
         refpad = np.concatenate([np.zeros(n_taps - 1, dtype=complex), ref, np.zeros(n_lead, dtype=complex)])
         self._taps_view = sliding_window_view(refpad, n_taps + n_lead)  # row t = ref[t-L+1 .. t+K]
-        self.bounds = [(s, min(n, s + batch_len)) for s in range(0, n, batch_len)]
+        starts = list(range(0, n, batch_len))
+        if len(starts) > 1 and n - starts[-1] < batch_len // 2:
+            starts.pop()                     # merge a short tail into the previous batch (no ill-posed tail fit)
+        self.bounds = [(s, e) for s, e in zip(starts, starts[1:] + [n])]
 
-        grams = np.array([self._dictionary(s, e).conj().T @ self._dictionary(s, e) for s, e in self.bounds])
+        def gram(s: int, e: int) -> np.ndarray:
+            d = self._dictionary(s, e)
+            return d.conj().T @ d
+
+        grams = np.array([gram(s, e) for s, e in self.bounds])
 
         def factor(g: np.ndarray):
             m = g.shape[0]
@@ -92,8 +99,8 @@ class EcaCanceller:
 
     def __call__(self, surv: np.ndarray) -> EcaResult:
         n = min(self.n, len(surv))
-        if n < self.n:
-            raise ValueError("surveillance record shorter than the reference used to build the canceller")
+        if len(surv) != self.n:
+            raise ValueError(f"surveillance has {len(surv)} samples, the canceller was built for {self.n}")
         surv = surv[:n]
         if self.window is None and self.doppler_offsets_hz == (0.0,):
             return self._call_fast(surv)

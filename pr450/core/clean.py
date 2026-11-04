@@ -140,7 +140,14 @@ def clean(
     max_iter: int = 12,
     half_taps: int = 8,
     canceller: Callable[[np.ndarray], np.ndarray] | None = None,
+    refits: int = 1,
 ) -> CleanResult:
+    """See the module docstring. `refits` extra fits of the same target are made
+    on the re-cancelled residual: fitting on the ECA output with an unprojected
+    dictionary under-estimates the echo by its zero-Doppler projection, which
+    left ~-37 dB of a 5.7 Hz target after one fit; one refit reaches ~-52 dB.
+    Targets within ~1/T of zero Doppler stay partly inside ECA's notch (~-25 dB).
+    """
     caf_kwargs = caf_kwargs or {}
     detect_kwargs = detect_kwargs or {}
     raw = surv
@@ -158,25 +165,27 @@ def clean(
             break
         strongest = dets[0]
         d0, f0 = refine_peak(rd, strongest)
-        echo = fit_echo(x, ref, fs, d0, f0, half_taps=half_taps)
-        if canceller is not None:
-            raw = raw[:len(echo)] - echo
-            x = canceller(raw)
-        else:
-            x = x[:len(echo)] - echo
+        for _ in range(1 + (refits if canceller is not None else 0)):
+            echo = fit_echo(x, ref, fs, d0, f0, half_taps=half_taps)
+            if canceller is not None:
+                raw = raw[:len(echo)] - echo
+                x = canceller(raw)
+            else:
+                x = x[:len(echo)] - echo
         comp = CleanComponent(d0, f0, strongest.snr_db, float("nan"))
         components.append(comp)
         pending = (comp, strongest.delay_idx, strongest.doppler_idx,
                    rd.power()[strongest.delay_idx, strongest.doppler_idx])
 
+    n_delay, n_doppler = rd.data.shape
     reported = [
         Detection(
             delay_s=c.delay_samples / fs,
             bistatic_range_m=c.delay_samples / fs * 299_792_458.0,
             doppler_hz=c.doppler_hz,
             snr_db=c.snr_db,
-            delay_idx=int(round(c.delay_samples)),
-            doppler_idx=-1,
+            delay_idx=int(np.clip(round(c.delay_samples), 0, n_delay - 1)),
+            doppler_idx=int(np.clip(np.argmin(np.abs(rd.doppler_hz - c.doppler_hz)), 0, n_doppler - 1)),
         )
         for c in components
     ]

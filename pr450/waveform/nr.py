@@ -120,7 +120,7 @@ def nr_csirs(cell_id: int, slot: int, l: int, n_values: int) -> np.ndarray:
     return qpsk_from_bits(gold_sequence(c_init, 2 * n_values))
 
 
-def nr_ssb_block(cell_id: int, i_ssb: int, rng: np.random.Generator):
+def nr_ssb_block(cell_id: int, i_ssb: int, rng: np.random.Generator, n_hf: int = 0):
     """4 x 240 SSB: values, RE types and modulation bits."""
     vals = np.zeros((4, SSB_SC), dtype=complex)
     types = np.zeros((4, SSB_SC), dtype=np.int8)
@@ -136,7 +136,7 @@ def nr_ssb_block(cell_id: int, i_ssb: int, rng: np.random.Generator):
     k = np.arange(SSB_SC)
     edge = (k < 48) | (k >= 192)
     pbch_region = {1: np.ones(SSB_SC, bool), 2: edge, 3: np.ones(SSB_SC, bool)}
-    dmrs = nr_pbch_dmrs(cell_id, i_ssb)
+    dmrs = nr_pbch_dmrs(cell_id, i_ssb + 4 * n_hf)   # L = 4: i_bar = i_SSB + 4 n_hf (38.211 7.4.1.4.1)
     pos = 0
     for sym in (1, 2, 3):
         region = pbch_region[sym]
@@ -196,13 +196,16 @@ def generate_nr(
         reserved = np.zeros((14, n_sc), dtype=bool)
         blocked_prbs: set[int] = set()
 
-        # SSB burst: first half-frame of every ssb_period_ms
-        if (frame * 10) % cfg.ssb_period_ms == 0 and ns in (0, 1):
+        # SSB burst in each half-frame that starts on an ssb_period_ms boundary counted from
+        # SFN 0 (so with a 20 ms period and an odd sfn0 the first frame correctly has none);
+        # a 5 ms period puts a burst in both half-frames. Case A: slots 0-1 of the half-frame.
+        hf, rel = divmod(ns, 5)
+        if (frame * 10 + 5 * hf) % cfg.ssb_period_ms == 0 and rel in (0, 1):
             for i_ssb, start in enumerate(SSB_START_SYMBOLS):
-                if not cfg.ssb_bitmap[i_ssb] or start // 14 != ns:
+                if not cfg.ssb_bitmap[i_ssb] or start // 14 != rel:
                     continue
                 s0 = start % 14
-                vals, types, bits = nr_ssb_block(cell, i_ssb, rng)
+                vals, types, bits = nr_ssb_block(cell, i_ssb, rng, n_hf=hf)
                 ks = slice(cfg.ssb_k0, cfg.ssb_k0 + SSB_SC)
                 g[s0:s0 + 4, ks] = vals
                 t[s0:s0 + 4, ks] = types
