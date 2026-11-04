@@ -1,0 +1,56 @@
+{
+ "standards": {
+  "LTE": "LTE Band 72",
+  "NR": "NR n72"
+ },
+ "loads": [
+  "idle",
+  "low",
+  "medium",
+  "high",
+  "full"
+ ],
+ "built": "2026-11-05T00:59:48",
+ "detection_range_km": {
+  "LTE": {
+   "idle": {
+    "drone": 12.4,
+    "car": 39.3,
+    "large_vehicle": 69.8
+   },
+   "medium": {
+    "drone": 15.8,
+    "car": 50.0,
+    "large_vehicle": 89.0
+   },
+   "full": {
+    "drone": 20.7,
+    "car": 65.5,
+    "large_vehicle": 116.5
+   }
+  },
+  "NR": {
+   "idle": {
+    "drone": 7.1,
+    "car": 22.5,
+    "large_vehicle": 40.1
+   },
+   "medium": {
+    "drone": 15.2,
+    "car": 48.1,
+    "large_vehicle": 85.5
+   },
+   "full": {
+    "drone": 20.6,
+    "car": 65.3,
+    "large_vehicle": 116.1
+   }
+  }
+ },
+ "notes": {
+  "frame_ms": 20,
+  "cpi_s": 0.5,
+  "max_range_km": 19.986163866666665,
+  "scenario": "baseline: Tx at origin, Rx 3 km east, EIRP 61 dBm, 40 clutter scatterers, 3 targets"
+ }
+}

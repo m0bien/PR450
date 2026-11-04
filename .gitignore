@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+
+# Editor / local tooling
+.vscode/
+.claude/
+
+# Generated outputs (rebuild with the scripts in scripts/)
+results/*
+!results/pd_pfa/
+results/pd_pfa/*
+!results/pd_pfa/summary.md
+*.cf32
+matlab/pr450_vectors.mat
+
+# Other projects that share this working folder
+DocLibrary/
+tradeoff_studio/
+eca_sfn/
+demo.py
+eca_demo_rdmaps.png
+eca_sfn_demo.jl

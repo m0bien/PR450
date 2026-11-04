@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>pr450 Passive Radar Explorer</title>
+<meta name="description" content="Interactive explorer of LTE and 5G NR 450 MHz downlink frames and passive radar processing, from the pr450 simulation framework.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='none' stroke='%232e6fdb' stroke-width='3'/%3E%3Ccircle cx='16' cy='16' r='7' fill='none' stroke='%232e6fdb' stroke-width='3'/%3E%3Ccircle cx='16' cy='16' r='2.5' fill='%23d1495b'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js" defer></script>
+<script src="app.js" defer></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="14"/><circle cx="16" cy="16" r="7"/><circle class="dot" cx="16" cy="16" r="2.5"/></svg>
+    <div>
+      <h1>Passive Radar Explorer</h1>
+      <p>450 MHz LTE &amp; 5G NR illuminators · simulated with <span class="mono">pr450</span></p>
+    </div>
+  </div>
+  <nav class="tabs" role="tablist" aria-label="Views">
+    <button role="tab" data-tab="frames" aria-selected="true">1 · OFDM frames</button>
+    <button role="tab" data-tab="radar" aria-selected="false">2 · Passive radar</button>
+  </nav>
+</header>
+
+<section class="controls" aria-label="Signal selection">
+  <div class="control">
+    <span class="control-label">Network</span>
+    <div class="seg" id="std-seg"></div>
+  </div>
+  <div class="control">
+    <span class="control-label">Cell load</span>
+    <div class="seg" id="load-seg"></div>
+  </div>
+  <p class="control-hint" id="load-hint"></p>
+</section>
+
+<main>
+  <!-- ============================ TAB 1 ============================ -->
+  <section class="tab-panel" id="tab-frames" role="tabpanel">
+    <div class="kpis" id="frame-kpis"></div>
+
+    <article class="card wide">
+      <header><h2>Resource grid</h2><span class="sub" id="grid-sub">20 ms · 300 subcarriers × 280 OFDM symbols</span></header>
+      <div class="legend" id="re-legend"></div>
+      <div class="plot tall" id="plot-grid"></div>
+      <p class="caption">Each cell is one resource element (15 kHz × one OFDM symbol). Pilots are what a passive radar can always rely on; data fills in with load.</p>
+    </article>
+
+    <div class="row">
+      <article class="card">
+        <header><h2>Power per OFDM symbol</h2><span class="sub">relative to a fully loaded carrier</span></header>
+        <div class="plot" id="plot-power"></div>
+        <p class="caption">Bursty traffic modulates the power of every echo the radar sees.</p>
+      </article>
+      <article class="card">
+        <header><h2>Spectrum</h2><span class="sub">4.5 MHz occupied of 7.68 MHz sampled</span></header>
+        <div class="plot" id="plot-spectrum"></div>
+        <p class="caption">300 subcarriers × 15 kHz. Range resolution follows from this bandwidth: about 67 m bistatic.</p>
+      </article>
+    </div>
+
+    <div class="row">
+      <article class="card">
+        <header><h2>Self-ambiguity · range cut</h2><span class="sub">zero Doppler, 200 ms</span></header>
+        <div class="plot" id="plot-af-range"></div>
+        <p class="caption" id="af-range-caption">Peaks away from 0 km are ghosts a strong target would create.</p>
+      </article>
+      <article class="card">
+        <header><h2>Self-ambiguity · Doppler cut</h2><span class="sub">zero delay</span></header>
+        <div class="plot" id="plot-af-doppler"></div>
+        <p class="caption" id="af-doppler-caption">Periodic signals (sync bursts) create Doppler ghosts.</p>
+      </article>
+    </div>
+
+    <article class="card narrow-plot">
+      <header><h2>Payload constellation</h2><span class="sub" id="const-sub"></span></header>
+      <div class="plot square" id="plot-const"></div>
+    </article>
+  </section>
+
+  <!-- ============================ TAB 2 ============================ -->
+  <section class="tab-panel" id="tab-radar" role="tabpanel" hidden>
+    <div class="pipeline" id="pipeline" aria-label="Processing stage"></div>
+    <div class="kpis" id="radar-kpis"></div>
+
+    <div class="row radar-row">
+      <article class="card">
+        <header><h2>Scene</h2><span class="sub">bistatic geometry · km</span></header>
+        <div class="plot square" id="plot-scene"></div>
+        <p class="caption">Each target sits on an ellipse of constant bistatic range with the transmitter and receiver as foci.</p>
+      </article>
+      <article class="card grow">
+        <header><h2>Range-Doppler map</h2><span class="sub" id="rd-sub"></span></header>
+        <div class="plot tall" id="plot-rd"></div>
+        <p class="caption" id="rd-caption"></p>
+      </article>
+    </div>
+
+    <div class="row split">
+      <article class="card grow">
+        <header><h2>Targets</h2><span class="sub">truth vs. what this stage detects</span></header>
+        <div class="table-wrap"><table id="target-table"></table></div>
+      </article>
+      <article class="card">
+        <header><h2>Detection range</h2><span class="sub">Pd 0.9 · Pfa 1e-6 · free space</span></header>
+        <div class="seg small" id="rcs-seg"></div>
+        <div class="plot" id="plot-range"></div>
+        <p class="caption">From the Monte Carlo study (1,728 trials per setting); geometric-mean range √(Rt·Rr). Assumed RCS.</p>
+      </article>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <span id="build-info"></span>
+  <span>All signals and scenes are simulated. Network parameters are assumptions, not operator data.</span>
+</footer>
+</body>
+</html>

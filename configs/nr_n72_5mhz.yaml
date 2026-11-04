@@ -1,0 +1,23 @@
+# NR FDD n72 (DL 461-466 MHz), 5 MHz carrier, 15 kHz SCS.
+# Assumed parameters for a private 450 MHz network -- update
+# with the real ARFCN / PCI / SSB / TRS configuration (decode MIB + SIB1 on site).
+standard: nr
+band: n72
+fc_hz: 463.5e+6
+n_rb: 25
+cell_id: 1
+ssb_period_ms: 20
+ssb_bitmap: [1, 0, 0, 0]  # single SSB beam (omni / single sector)
+ssb_k0: 30                # first SSB subcarrier within the carrier grid
+coreset_symbols: 2
+coreset_rb_start: 0
+coreset_n_rb: 24
+pdcch_fraction: 0.5
+dmrs_additional_pos: 1    # PDSCH DMRS in symbols 2 and 11
+trs_period_ms: 20         # set to null to disable TRS
+trs_slot_offset: 4
+trs_k0: 0
+sib1_period_ms: 20
+sib1_slot: 2
+sib1_n_rb: 4
+sfn0: 0

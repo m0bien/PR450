@@ -1,0 +1,12 @@
+# LTE FDD Band 72 (DL 461-466 MHz), 5 MHz carrier.
+# Assumed parameters for a private 450 MHz network -- update
+# with the operator's real EARFCN / PCI / port count when available.
+standard: lte
+band: B72
+fc_hz: 463.5e+6
+n_rb: 25
+cell_id: 1
+n_ports: 2        # CRS ports; 450 MHz macro sites are commonly 2T
+cfi: 2            # control-region symbols
+sib1: true
+sfn0: 0

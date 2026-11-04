@@ -1,0 +1,36 @@
+# Baseline single-illuminator geometry (placeholder until site data exists).
+# Positions in metres, local frame: x east, y north, z up.
+tx_position_m: [0.0, 0.0, 30.0]        # gNB / eNB
+rx_position_m: [3000.0, 0.0, 10.0]     # passive radar receiver
+eirp_dbm: 61.0                         # ~40 W into a 15 dBi sector antenna
+ref_gain_dbi: 10.0                     # reference Yagi pointed at the gNB
+surv_gain_dbi: 10.0                    # surveillance antenna
+dpi_suppression_db: 25.0               # surveillance-antenna rejection toward the gNB
+ref_multipath:                         # [excess path m, level dB rel. direct] on the reference channel
+  - [150.0, -15.0]
+  - [420.0, -22.0]
+noise_figure_db: 5.0
+temperature_k: 290.0
+adc_bits: 12
+adc_backoff_db: 12.0
+
+clutter:
+  n_scatterers: 40
+  max_radius_m: 2000.0                 # keeps clutter within ~4 km bistatic range
+  rcs_dbsm_mean: 30.0
+  rcs_dbsm_std: 8.0
+  seed: 1
+
+targets:
+  - name: car
+    position_m: [4000.0, 2500.0, 1.5]
+    velocity_mps: [-15.0, 10.0, 0.0]
+    rcs_dbsm: 10.0
+  - name: drone
+    position_m: [2500.0, 1200.0, 80.0]
+    velocity_mps: [5.0, -8.0, 1.0]
+    rcs_dbsm: -10.0
+  - name: truck_far
+    position_m: [9000.0, -6000.0, 2.0]
+    velocity_mps: [20.0, 0.0, 0.0]
+    rcs_dbsm: 15.0
